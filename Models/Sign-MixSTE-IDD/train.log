@@ -443,3 +443,6 @@
 2025-12-15 13:56:52,989 Epoch   7 Step:     1500 Batch Loss:     0.002068 Tokens per Sec:  2728973, Lr: 0.001000
 2025-12-15 13:57:09,501 Epoch   7: total training loss 0.71056
 2025-12-15 13:57:09,501 EPOCH 8
+2025-12-15 13:58:10,568 Epoch   8 Step:     1750 Batch Loss:     0.002326 Tokens per Sec:  2741611, Lr: 0.001000
+2025-12-15 13:58:18,631 Epoch   8: total training loss 0.91707
+2025-12-15 13:58:18,632 EPOCH 9
