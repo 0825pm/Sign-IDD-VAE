@@ -37,6 +37,7 @@ class ACD_Denoiser(nn.Module):
                  **kwargs):
         super(ACD_Denoiser, self).__init__()
 
+        # self.in_feature_size = trg_size * 2 + (trg_size // 3) * 4
         self.in_feature_size = trg_size + (trg_size // 3) * 4
         self.out_feature_size = trg_size
 

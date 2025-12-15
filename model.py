@@ -3,7 +3,8 @@ import torch.nn as nn
 
 from torch import Tensor
 from encoder import Encoder
-from ACD import ACD
+# from ACD import ACD
+from ACD_MixSTE import ACD
 from batch import Batch
 from embeddings import Embeddings
 from vocabulary import Vocabulary

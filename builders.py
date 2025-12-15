@@ -126,7 +126,7 @@ def build_scheduler(config: dict, optimizer: Optimizer, scheduler_mode: str,
             scheduler = ReduceLROnPlateau(
                 optimizer=optimizer,
                 mode=scheduler_mode,
-                verbose=False,
+                # verbose=False,
                 threshold_mode='abs',
                 threshold=1e-8,
                 factor=config.get("decrease_factor", 0.1),
