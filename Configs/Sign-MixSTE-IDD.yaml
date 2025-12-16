@@ -22,7 +22,7 @@ training:
     learning_rate_min: 0.0002 # Learning rate minimum, when training will stop
     weight_decay: 0.0   # Weight Decay
     clip_grad_norm: 5.0   # Gradient clipping value
-    batch_size: 32    # Batch Size for training
+    batch_size: 64    # Batch Size for training
     scheduling: "plateau"   # Scheduling at training time (plateau, ...)
     patience: 7  # How many epochs of no improvement causes a LR reduction
     decrease_factor: 0.7  # LR reduction factor, after the # of patience epochs
@@ -31,7 +31,7 @@ training:
     validation_freq: 2000 # After how many steps to run a validation on the model
     logging_freq: 250  # After how many steps to log training progress
     eval_metric: "dtw"  # Evaluation metric during training (dtw','bt','mpjpe')
-    model_dir: "./Models/Sign-MixSTE-IDD" # Where the model shall be stored
+    model_dir: "./Models/finetune" # Where the model shall be stored
     overwrite: False # Flag to overwrite a previous saved model in the model_dir
     continue: True  # Flag to continue from a previous saved model in the model_dir
     shuffle: True  # Flag to shuffle the data during training
@@ -55,10 +55,10 @@ model:
         num_layers: 2 # Number of layers
         num_heads: 4  # Number of Heads
         embeddings:
-            embedding_dim: 512  # Embedding Dimension
+            embedding_dim: 64  # Embedding Dimension
             dropout: 0.0 # Embedding Dropout
-        hidden_size: 512 # Hidden Size Dimension
-        ff_size: 2048 # Feed-forward dimension (4 x hidden_size)
+        hidden_size: 64 # Hidden Size Dimension
+        ff_size: 256 # Feed-forward dimension (4 x hidden_size)
         dropout: 0.0 # Encoder Dropout
     diffusion:
         timesteps: 1000
@@ -66,18 +66,25 @@ model:
         scale: 1.0
         num_layers: 2
         num_heads: 4
-        hidden_size: 512
-        ff_size: 2048
+        hidden_size: 64
+        ff_size: 256
         dropout: 0.1
         embeddings:
-          embedding_dim: 512 # Embedding Dimension
+          embedding_dim: 64 # Embedding Dimension
           dropout: 0.1 # Embedding Dropout
     # ★ MixSTE Encoder Configuration (NEW) ★
-    mixste:
-        embed_dim: 256        # Embedding dimension for MixSTE
-        depth: 1              # Number of spatial-temporal transformer blocks
-        num_heads: 4          # Number of attention heads
-        mlp_ratio: 2.0        # MLP hidden dimension ratio
-        drop_rate: 0.1        # Dropout rate
-        attn_drop_rate: 0.0   # Attention dropout rate
-        drop_path_rate: 0.1   # Stochastic depth rate
+    spl:
+        depth: 4 # Number of layers
+        num_heads: 8  # Number of Heads
+        num_tokens: 8 # Number of Tokens for Qformer
+        hidden_size: 64 # Hidden Size Dimension
+        ff_size: 64 # Feed-forward dimension (4 x hidden_size)
+        dropout: 0.1 # Encoder Dropout
+        drop_rate: 0.1
+        drop_path_rate: 0.1
+        attn_drop_rate: 0.
+        qkv_bias: True
+        qk_scale: # None
+        max_len: 300
+        loss: "L1"
+        bone_loss: "MSE"

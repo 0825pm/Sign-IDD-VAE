@@ -21,6 +21,8 @@ from builders import build_gradient_clipper, build_optimizer, build_scheduler
 from plot_videos import plot_video, alter_DTW_timing
 from prediction import validate_on_data
 
+from torch.cuda.amp import autocast, GradScaler
+
 class TrainManager:
 
     def __init__(self, model: Model, config: dict, test=False):
@@ -222,7 +224,7 @@ class TrainManager:
             self.model.cuda()
 
     # Train and validate function
-    def train_and_validate(self, train_data: Dataset, valid_data: Dataset) -> None:
+    def train_and_validate(self, train_data: Dataset, valid_data: Dataset, is_pretrain: bool) -> None:
 
         # Make training iterator
         train_iter = make_data_iter(train_data,
@@ -239,6 +241,7 @@ class TrainManager:
                 self.scheduler.step(epoch=epoch_no)
 
             self.model.train()
+            self.model.SPL_AE.eval()
 
             # Reset statistics for each epoch.
             start = time.time()
@@ -250,6 +253,20 @@ class TrainManager:
             for batch in iter(train_iter):
                 # reactivate training
                 self.model.train()
+                
+                # valid_score, valid_loss, valid_references, valid_hypotheses, \
+                #         valid_inputs, all_dtw_scores, valid_file_paths = \
+                #         validate_on_data(
+                #             batch_size=self.eval_batch_size,
+                #             data=valid_data,
+                #             eval_metric=self.eval_metric,
+                #             model=self.model,
+                #             max_output_length=self.max_output_length,
+                #             loss_function=self.loss,
+                #             batch_type=self.eval_batch_type,
+                #             type="val",
+                #             is_pretrain=is_pretrain
+                #         )
 
                 # create a Batch object from torchtext batch
                 batch = Batch(torch_batch=batch,
@@ -259,7 +276,7 @@ class TrainManager:
                 update = count == 0
 
                 # Train the model on a batch
-                batch_loss = self._train_batch(batch, update=update)
+                batch_loss = self._train_batch(batch, update=update, is_pretrain=is_pretrain)
 
                 self.tb_writer.add_scalar("train/train_batch_loss", batch_loss,self.steps)
                 count = self.batch_multiplier if update else count
@@ -299,6 +316,7 @@ class TrainManager:
                             loss_function=self.loss,
                             batch_type=self.eval_batch_type,
                             type="val",
+                            is_pretrain=is_pretrain
                         )
                     
                     val_step += 1
@@ -460,10 +478,10 @@ class TrainManager:
         print("The skeletons of %s date have been save." % type)
 
     # Train the batch
-    def _train_batch(self, batch: Batch, update: bool = True) -> Tensor:
+    def _train_batch(self, batch: Batch, update: bool = True, is_pretrain: bool = True) -> Tensor:
 
         # Get loss from this batch
-        batch_loss = self.model.get_loss_for_batch(is_train=True,
+        batch_loss = self.model.get_loss_for_batch(is_train=True, is_pretrain=is_pretrain,
                                                           batch=batch,
                                                           loss_function=self.loss)
 
@@ -532,7 +550,7 @@ class TrainManager:
         assert trainable_params
 
 
-def train(cfg_file: str, ckpt=None):
+def train(cfg_file: str, ckpt=None, is_pretrain=True):
 
     # Load the config file
     cfg = load_config(cfg_file)
@@ -544,13 +562,38 @@ def train(cfg_file: str, ckpt=None):
     train_data, dev_data, test_data, src_vocab, trg_vocab = load_data(cfg=cfg)
 
     # Build the Sign-IDD model
-    model = build_model(cfg=cfg, src_vocab=src_vocab, trg_vocab=trg_vocab)
+    model = build_model(cfg=cfg, src_vocab=src_vocab, trg_vocab=trg_vocab, is_pretrain=is_pretrain)
 
+    # if ckpt is not None:
+    #     use_cuda = cfg["training"].get("use_cuda", True)
+    #     model_checkpoint = load_checkpoint(ckpt, use_cuda=use_cuda)
+    #     # Build model and load parameters from the checkpoint
+    #     model.load_state_dict(model_checkpoint["model_state"], strict=False)
+    
     if ckpt is not None:
         use_cuda = cfg["training"].get("use_cuda", True)
         model_checkpoint = load_checkpoint(ckpt, use_cuda=use_cuda)
-        # Build model and load parameters from the checkpoint
-        model.load_state_dict(model_checkpoint["model_state"])
+        
+        pretrained_dict = model_checkpoint["model_state"]
+        
+        # SPL_AE 가중치만 필터링
+        spl_ae_dict = {k: v for k, v in pretrained_dict.items() if k.startswith('SPL_AE.')}
+        
+        # 로드
+        model_dict = model.state_dict()
+        model_dict.update(spl_ae_dict)
+        model.load_state_dict(model_dict)
+        
+        # ★ SPL_AE freeze ★
+        for param in model.SPL_AE.parameters():
+            param.requires_grad = False
+        
+        print(f"Loaded and froze {len(spl_ae_dict)} SPL_AE parameters")
+        
+        # 학습 가능한 파라미터 수 확인
+        trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        total = sum(p.numel() for p in model.parameters())
+        print(f"Trainable: {trainable:,} / Total: {total:,}")
 
     # for training management, e.g. early stopping and model selection
     trainer = TrainManager(config=cfg, model=model, test=False)
@@ -561,9 +604,9 @@ def train(cfg_file: str, ckpt=None):
     log_cfg(cfg, trainer.logger)
 
     # Train the model
-    trainer.train_and_validate(train_data=train_data, valid_data=dev_data)
+    trainer.train_and_validate(train_data=train_data, valid_data=dev_data, is_pretrain=is_pretrain)
 
-def test(cfg_file, ckpt: str):
+def test(cfg_file, ckpt: str, is_pretrain: bool):
 
     # Load the config file
     cfg = load_config(cfg_file)
@@ -597,7 +640,7 @@ def test(cfg_file, ckpt: str):
 
     # Build model and load parameters into it
     model = build_model(cfg=cfg, src_vocab=src_vocab, trg_vocab=trg_vocab)
-    model.load_state_dict(model_checkpoint["model_state"])
+    model.load_state_dict(model_checkpoint["model_state"], strict=False)
 
     # If cuda, set model as cuda
     if use_cuda:
@@ -619,7 +662,8 @@ def test(cfg_file, ckpt: str):
                 eval_metric=eval_metric,
                 loss_function=None,
                 batch_type=batch_type,
-                type="val" if not data_set_name is "train" else "train_inf"
+                type="val" if not data_set_name is "train" else "train_inf",
+                is_pretrain=is_pretrain
             )
         if not os.path.exists(os.path.join(model_dir, 'test_videos')):
             os.mkdir(os.path.join(model_dir, 'test_videos'))

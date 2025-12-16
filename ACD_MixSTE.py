@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from collections import namedtuple
 from torch import nn
 from ACD_Denoiser import ACD_Denoiser
-from mixste_encoder import MixSTEEncoderForACD
+from spl_ae import SPL_AE
 from ID import ID
 
 __all__ = ["ACD"]
@@ -85,18 +85,15 @@ class ACD(nn.Module):
         self.register_buffer('posterior_mean_coef2',
                              (1. - alphas_cumprod_prev) * torch.sqrt(alphas) / (1. - alphas_cumprod))
 
-        self.mixste_encoder = MixSTEEncoderForACD(num_joints=50,
-                                                    in_chans=7,
-                                                    embed_dim=args["mixste"].get('embed_dim', 512),
-                                                    depth=args["mixste"].get('depth', 1),
-                                                    num_heads=args["mixste"].get('num_heads', 4),
-                                                    mlp_ratio=args["mixste"].get('mlp_ratio', 2),
-                                                    qkv_bias=True,
-                                                    qk_scale=None,
-                                                    drop_rate=args["mixste"].get('drop_rate', 0.1),
-                                                    attn_drop_rate=args["mixste"].get('attn_drop_rate', 0.0),
-                                                    drop_path_rate=args["mixste"].get('drop_path_rate', 0.1)
-                                                    )
+        self.spl_ae = SPL_AE(embed_dim=args["spl"].get('hidden_size', 64),
+                                     depth=args["spl"].get('depth', 1),
+                                     num_heads=args["spl"].get('num_heads', 8),
+                                     mlp_dim=args["spl"].get('ff_size', 64),
+                                     qkv_bias=args["spl"].get('qkv_bias', True),
+                                     qk_scale=args["spl"].get('qk_scale', None),
+                                     attn_drop_rate=args["spl"].get('attn_drop_rate', 0.),
+                                     drop_rate=args["spl"].get('drop_rate', 0.1),
+                                     max_len=args["spl"].get('max_len', 300))
 
         self.ACD_Denoiser = ACD_Denoiser(num_layers=args["diffusion"].get('num_layers', 2),
                                          num_heads=args["diffusion"].get('num_heads', 4),
@@ -108,8 +105,6 @@ class ACD(nn.Module):
                                          freeze=False,
                                          trg_size=args.get('trg_size', 150),
                                          decoder_trg_trg_=True)
-
-        self.fusion_layer = nn.Linear(350+150, 350)
         
     def predict_noise_from_start(self, x_t, t, x0):
         return (
@@ -118,19 +113,16 @@ class ACD(nn.Module):
         )
 
     def model_predictions(self, x, encoder_output, t, src_mask, trg_mask):
+        pose_length = trg_mask[...,0].sum(dim=-1).ravel()
         x_t = ID(x)
         x_t = x_t / self.scale
-
-        mix_pose = self.mixste_encoder(x_t)
-        x_t = torch.cat([x_t, mix_pose], dim=-1)
-        x_t = self.fusion_layer(x_t)
         
         pred_pose = self.ACD_Denoiser(encoder_output=encoder_output,
                                       trg_embed=x_t,
                                       src_mask=src_mask,
                                       trg_mask=trg_mask,
                                       t=t)
-        
+        pred_pose = self.spl_ae(pred_pose, pose_length)
         
 
         x_start = pred_pose
@@ -196,20 +188,20 @@ class ACD(nn.Module):
             return results[self.sampling_timesteps-1]
 
         if is_train:
+            pose_length = trg_mask[...,0].sum(dim=-1).ravel()
+        
             x_poses, noises, t = self.prepare_targets(input_3d)
             x_poses = x_poses.float()
             x_poses = ID(x_poses)
-            mix_pose = self.mixste_encoder(x_poses)
-            x_poses = torch.cat([x_poses, mix_pose], dim=-1)
-            x_poses = self.fusion_layer(x_poses)
-            
             t = t.squeeze(-1)
             pred_pose = self.ACD_Denoiser(encoder_output=encoder_output,
                                           trg_embed=x_poses,
                                           src_mask=src_mask,
                                           trg_mask=trg_mask,
                                           t=t)
-            return pred_pose
+            
+            pred_pose_spl = self.spl_ae(pred_pose, pose_length)
+            return pred_pose, pred_pose_spl
 
     def prepare_diffusion_concat(self, pose_3d):
 

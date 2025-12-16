@@ -17,7 +17,9 @@ def validate_on_data(model: Model,
                      loss_function: torch.nn.Module = None,
                      batch_type: str = "sentence",
                      type = "val",
-                     BT_model = None):
+                     BT_model = None,
+                     is_pretrain: bool = True
+                     ):
 
     valid_iter = make_data_iter(
         dataset=data, batch_size=batch_size, batch_type=batch_type,
@@ -49,7 +51,7 @@ def validate_on_data(model: Model,
             # run as during training with teacher forcing
             if loss_function is not None and batch.trg is not None:
                 # Get the loss for this batch
-                batch_loss = model.get_loss_for_batch(is_train=True,
+                batch_loss = model.get_loss_for_batch(is_train=True, is_pretrain=is_pretrain,
                                                          batch=batch,
                                                          loss_function=loss_function)
 
@@ -62,7 +64,11 @@ def validate_on_data(model: Model,
                                        src_mask=batch.src_mask,
                                        src_lengths=batch.src_lengths,
                                        trg_mask=batch.trg_mask,
-                                       is_train=False)
+                                       is_train=False,
+                                       is_pretrain=is_pretrain)
+            
+            if is_pretrain:
+                output, _, _ = output[0], output[1], output[2]
             
             output = torch.cat((output, batch.trg_input[:, :, 150:]), dim=-1)
             
