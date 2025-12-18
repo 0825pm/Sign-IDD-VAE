@@ -37,8 +37,7 @@ class ACD_Denoiser(nn.Module):
                  **kwargs):
         super(ACD_Denoiser, self).__init__()
 
-        self.in_feature_size = hidden_size
-        # self.in_feature_size = trg_size + (trg_size // 3) * 4
+        self.in_feature_size = trg_size + (trg_size // 3) * 4
         self.out_feature_size = trg_size
 
         self.pos_drop = nn.Dropout(p=emb_dropout)
@@ -104,21 +103,21 @@ class ACD_Denoiser(nn.Module):
                              src_mask=src_mask, trg_mask=sub_mask, padding_mask=padding_mask)
 
         x = self.layer_norm_mid(x)
-        output = self.output_layer_mid(x)
-        # o_reshaped = x.view(x.shape[0], x.shape[1], 50, 7)
-        # o_1, o_2 = torch.split(o_reshaped, [3, 4], dim=-1)
-        # o_1 = o_1.reshape(o_1.shape[0], o_1.shape[1], 50 * 3)
-        # o_2 = o_2.reshape(o_2.shape[0], o_2.shape[1], 50 * 4)
-        # o_1 = self.o1_embed(o_1)
-        # o_2 = self.o2_embed(o_2)
+        x = self.output_layer_mid(x)
+        o_reshaped = x.view(x.shape[0], x.shape[1], 50, 7)
+        o_1, o_2 = torch.split(o_reshaped, [3, 4], dim=-1)
+        o_1 = o_1.reshape(o_1.shape[0], o_1.shape[1], 50 * 3)
+        o_2 = o_2.reshape(o_2.shape[0], o_2.shape[1], 50 * 4)
+        o_1 = self.o1_embed(o_1)
+        o_2 = self.o2_embed(o_2)
 
-        # x, h = self.layers_mha_ac(x=o_1, memory=o_2,
-        #              src_mask=sub_mask, trg_mask=sub_mask, padding_mask=padding_mask)
+        x, h = self.layers_mha_ac(x=o_1, memory=o_2,
+                     src_mask=sub_mask, trg_mask=sub_mask, padding_mask=padding_mask)
 
-        # # Apply a layer normalisation
-        # x = self.layer_norm(x)
-        # # Output layer turns it back into vectors of size trg_size
-        # output = self.output_layer(x)
+        # Apply a layer normalisation
+        x = self.layer_norm(x)
+        # Output layer turns it back into vectors of size trg_size
+        output = self.output_layer(x)
 
         return output
 

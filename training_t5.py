@@ -13,7 +13,7 @@ from batch import Batch
 from torchtext.data import Dataset
 from helpers import load_config, set_seed, load_checkpoint, log_cfg, make_model_dir, make_logger, ConfigurationError, get_latest_checkpoint, symlink_update
 from data import load_data, make_data_iter
-from model import build_model, Model
+from flan_t5_pose_model import build_model, Model
 from torch.utils.tensorboard import SummaryWriter
 from constants import TARGET_PAD
 from loss import Loss

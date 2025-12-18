@@ -33,7 +33,7 @@ class Loss(nn.Module):
         self.target_pad = target_pad
         self.loss_scale = model_cfg.get("loss_scale", 1.0)
 
-    def forward(self, preds, targets, is_vae, mu=None, logvar=None):
+    def forward(self, preds, targets):
 
         loss_mask = (targets != self.target_pad)
 
@@ -55,11 +55,6 @@ class Loss(nn.Module):
         # Multiply loss by the loss scale
         if self.loss_scale != 1.0:
             loss = loss * self.loss_scale
-            
-        if is_vae and mu is not None and logvar is not None:
-            kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp(), dim=-1)
-            kl_loss = kl_loss.mean()
-            loss = loss + kl_loss * 1e-5
 
         return loss
 

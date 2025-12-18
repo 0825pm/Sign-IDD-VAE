@@ -102,8 +102,8 @@ class ACD(nn.Module):
         )
 
     def model_predictions(self, x, encoder_output, t, src_mask, trg_mask):
-        # x_t = ID(x)
-        x_t = x / self.scale
+        x_t = ID(x)
+        x_t = x_t / self.scale
 
         pred_pose = self.ACD_Denoiser(encoder_output=encoder_output,
                                       trg_embed=x_t,
@@ -119,7 +119,7 @@ class ACD(nn.Module):
 
     def ddim_sample(self, encoder_output, input_3d, src_mask, trg_mask):
         batch = encoder_output.shape[0]
-        shape = (batch, input_3d.shape[1], input_3d.shape[2])
+        shape = (batch, input_3d.shape[1], 150)
         total_timesteps, sampling_timesteps, eta = self.num_timesteps, self.sampling_timesteps, self.ddim_sampling_eta
 
         # [-1, 0, 1, 2, ..., T-1] when sampling_timesteps == total_timesteps
@@ -176,7 +176,7 @@ class ACD(nn.Module):
         if is_train:
             x_poses, noises, t = self.prepare_targets(input_3d)
             x_poses = x_poses.float()
-            # x_poses = ID(x_poses)
+            x_poses = ID(x_poses)
             t = t.squeeze(-1)
             pred_pose = self.ACD_Denoiser(encoder_output=encoder_output,
                                           trg_embed=x_poses,
@@ -188,7 +188,7 @@ class ACD(nn.Module):
     def prepare_diffusion_concat(self, pose_3d):
 
         t = torch.randint(0, self.num_timesteps, (1,), device='cuda').long()
-        noise = torch.randn(pose_3d.shape[0], pose_3d.shape[-1], device='cuda')
+        noise = torch.randn(pose_3d.shape[0],150, device='cuda')
 
         x_start = pose_3d
 

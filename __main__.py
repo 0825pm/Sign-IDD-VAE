@@ -2,14 +2,13 @@
 import argparse
 import os
 
-from training import train, test
+from training_t5 import train, test
 def main():
 
     ap = argparse.ArgumentParser("Sign-IDD: Iconicity Disentangled Diffusion for Sign Language Production")
 
     # Choose between Train and Test
     ap.add_argument("mode", choices=["train", "test"], help="train a model or test")
-    ap.add_argument("pretrain", choices=["pretrain", "finetune"], help="pretrain a model or finetune")
     # Path to Config
     ap.add_argument("config_path", default="./Configs/Sign-IDD.yaml", type=str, help="path to YAML config file")
 
@@ -24,10 +23,10 @@ def main():
 
     # If Train
     if args.mode == "train":
-        train(cfg_file=args.config_path, ckpt=args.ckpt, is_pretrain=(args.pretrain=="pretrain"))
+        train(cfg_file=args.config_path, ckpt=args.ckpt)
     # If Test
     elif args.mode == "test":
-        test(cfg_file=args.config_path, ckpt=args.ckpt, is_pretrain=(args.pretrain=="pretrain"))
+        test(cfg_file=args.config_path, ckpt=args.ckpt)
     else:
         raise ValueError("Unknown mode")
 

@@ -1,0 +1,110 @@
+# FlanT5-Pose.yaml
+# Configuration for Flan-T5 based Non-Autoregressive Pose Generation
+# Compatible with Sign-IDD config format
+
+name: "FlanT5-Pose"
+
+data:
+    src: "gloss"    # Source - Either Gloss->Pose or Text->Pose (gloss,text)
+    trg: "skels"    # Target - 3D body co-ordinates (skels)
+    files: "files"    # Filenames for each sequence
+
+    train: "/home/user/Projects/Data/new_phoenix/train"
+    dev: "/home/user/Projects/Data/new_phoenix/dev"
+    test: "/home/user/Projects/Data/new_phoenix/test"
+
+    max_sent_length: 300 # Max Sentence Length
+    skip_frames: 1   # Skip frames in the data, to reduce the data input size
+    src_vocab: "/home/user/Projects/research/Sign-IDD-VAE/Configs/src_vocab.txt"
+
+training:
+    # Directory
+    model_dir: "./Models/flant5_pose"
+    overwrite: False
+    continue: True
+    
+    # Random seed
+    random_seed: 42
+    
+    # Device
+    use_cuda: True
+    
+    # Training
+    epochs: 100
+    batch_size: 64
+    eval_batch_size: 64
+    batch_type: "sentence"
+    eval_batch_type: "sentence"
+    batch_multiplier: 1
+    
+    # Loss (Sign-IDD format)
+    loss: "mse"
+    bone_loss: "mse"
+    
+    # Optimizer
+    optimizer: "adam"
+    learning_rate: 0.0001
+    weight_decay: 0.0001
+    adam_betas: [0.9, 0.999]
+    
+    # Gradient clipping
+    clip_grad_norm: 1.0
+    
+    # Learning rate scheduler
+    scheduling: "plateau"
+    patience: 10
+    decrease_factor: 0.5
+    
+    # Validation
+    validation_freq: 500
+    logging_freq: 100
+    
+    # Evaluation
+    eval_metric: "dtw"
+    early_stopping_metric: "dtw"
+    
+    # Checkpointing
+    keep_last_ckpts: 3
+    
+    # Output
+    max_output_length: 300
+
+model:
+    # Target size (pose dimension)
+    trg_size: 150
+    num_frames: 300         # Fixed output frame count
+    loss_scale: 1.0
+    
+    # Encoder settings (Sign-IDD format for source embedding)
+    encoder:
+        hidden_size: 512
+        ff_size: 2048
+        num_heads: 8
+        num_layers: 4
+        dropout: 0.1
+        embeddings:
+            embedding_dim: 512
+            dropout: 0.1
+    
+    # T5 Encoder settings
+    t5:
+        model_path: "google/flan-t5-base"  # HuggingFace model ID
+        hidden_size: 768
+    
+    # LoRA settings
+    lora:
+        use_lora: True
+        r: 16                   # LoRA rank
+        alpha: 32               # LoRA alpha
+        dropout: 0.1
+        target_modules:
+            - "q"
+            - "v"
+    
+    # Decoder settings
+    decoder:
+        num_layers: 6
+        num_heads: 8
+        hidden_size: 768
+        ff_size: 2048
+        dropout: 0.1
